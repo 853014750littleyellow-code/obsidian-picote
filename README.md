@@ -30,6 +30,33 @@
 
 下列版本号与仓库内 [`manifest.json`](./manifest.json) 的 **`version`** 字段一致。
 
+### [2.3.5] — 2026-05-12
+
+**类型**：稳定性与体验修复（Bugfix）。
+
+**升级**：替换 **`main.js`、`manifest.json`**（本版未改 `styles.css`），在 Obsidian 中关闭再启用本插件或重启应用。
+
+#### Bug 10：在分栏里输入文字后，文字消失或跑到分栏外面
+
+**用户场景**：
+
+- 在某一栏里打「猫咪公馆」等文字，停顿一会儿后字突然不见；或下一刻输入直接出现在**分栏外的笔记正文**里，无法继续在分栏内编辑。
+
+**原因**：
+
+- v2.3.2 起 `input` / `compositionend` 在 800ms / 120ms 防抖后会 `syncToSource` 把内容写回 Markdown 源码。
+- Live Preview 模式下，源码一旦变化，Obsidian 会**用全新的 DOM 节点替换**整个分栏代码块（这是 CM6 atomic widget 的工作方式）。
+- v2.3.2 加在 wrapper 上的 `_dtSkipRebuild` 标记**只对同一个 DOM 节点有效**；Obsidian 用新节点整体替换旧节点时，标记并不会被搬到新节点上。
+- 后果：用户正在编辑的 `.dt-column` 节点被销毁 → 焦点掉到 CodeMirror → 还没"上屏"的字符被截断（消失）；后续按键直接落进笔记源码（"跑到分栏外"）。
+
+**处理**：
+
+- **编辑期间彻底不写回源码**：`input` / `compositionend` / `Enter` 三处都只更新 `wrapperEl._dtColumns` 数组，不再触发任何 `debouncedSync` / `syncToSource`，并主动清掉 `_syncTimer`。
+- **失焦时统一同步**：仍由 `blur` 触发一次 `debouncedSync` 写回源码并允许 post-processor 重建 DOM；保留 v2.3.3 的「孤儿节点 (`!col.isConnected`) 跳过」守卫，杜绝旧内容反向覆盖。
+- 体验：写字、中文拼音、换行不会被任何异步重建打断；切换到其他位置或保存前的失焦时，源码会一次性同步到位。
+
+---
+
 ### [2.3.4] — 2026-05-12
 
 **类型**：稳定性与体验修复（Bugfix）。

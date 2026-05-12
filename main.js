@@ -18,7 +18,7 @@ var COL_SEP = "|||";
 var NEWLINE_TOKEN = "<br>";
 
 /** 与 manifest.json 同步，便于启动提示与自检 */
-var DT_COLUMNS_VER = "2.3.4";
+var DT_COLUMNS_VER = "2.3.5";
 
 /* =============================================================
    Helpers
@@ -1680,9 +1680,9 @@ function bindColumnEvents(col, columns, colIdx, wrapperEl, plugin) {
 			} else {
 				col.removeAttribute("data-placeholder");
 			}
-			if (col._dtImeComposing) return;
-			if (_syncTimer) clearTimeout(_syncTimer);
-			_syncTimer = setTimeout(function () { debouncedSync(wrapperEl); }, 800);
+			/* 不在 Enter 时 sync：写回源码会让 Obsidian 重新生成代码块 DOM，
+			 * 当前 .dt-column 节点会被销毁，焦点和未上屏的输入都丢失。
+			 * 失焦时再统一同步即可（见 col blur 处理）。 */
 			return;
 		}
 
@@ -1735,13 +1735,13 @@ function bindColumnEvents(col, columns, colIdx, wrapperEl, plugin) {
 		} else {
 			col.removeAttribute("data-placeholder");
 		}
+		/* 不在打字过程中 syncToSource：写回源码会让 Obsidian 用新 DOM 节点替换整个分栏代码块，
+		 * 当前 .dt-column 被销毁、焦点丢失，未上屏字符会消失，后续按键会跑到分栏外面。
+		 * 失焦时再统一同步（见 col blur 处理）。 */
 		if (_syncTimer) {
 			clearTimeout(_syncTimer);
 			_syncTimer = null;
 		}
-		_syncTimer = setTimeout(function () {
-			debouncedSync(wrapperEl);
-		}, 120);
 	});
 
 	col.addEventListener("input", function (e) {
@@ -1753,19 +1753,12 @@ function bindColumnEvents(col, columns, colIdx, wrapperEl, plugin) {
 		} else {
 			col.removeAttribute("data-placeholder");
 		}
-
-		if (col._dtImeComposing || (e && e.isComposing)) {
-			if (_syncTimer) {
-				clearTimeout(_syncTimer);
-				_syncTimer = null;
-			}
-			return;
+		/* 同上：编辑期间只更新 wrapper 持有的 columns 数组（保持新内容），不写回源码。
+		 * 这样 markdown post-processor 不会异步重建 DOM，输入永远不会被打断。 */
+		if (_syncTimer) {
+			clearTimeout(_syncTimer);
+			_syncTimer = null;
 		}
-
-		if (_syncTimer) clearTimeout(_syncTimer);
-		_syncTimer = setTimeout(function () {
-			debouncedSync(wrapperEl);
-		}, 800);
 	});
 
 	col.addEventListener("focus", function () {

@@ -1,7 +1,7 @@
 {
 	"id": "picote",
 	"name": "picote",
-	"version": "2.3.4",
+	"version": "2.3.5",
 	"minAppVersion": "1.0.0",
 	"description": "Column layout, drag & drop, inline editing, remote image paste auto-download.",
 	"author": "Pipi_huang",
