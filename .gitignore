@@ -1,0 +1,9 @@
+# 备份与临时文件
+*.bak
+*.log
+.DS_Store
+Thumbs.db
+
+# 若以后有加源码构建
+node_modules/
+dist/

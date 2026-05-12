@@ -1,0 +1,507 @@
+/* =============================================================
+   DingTalk Columns — styles.css (v3)
+   ============================================================= */
+
+.cm-editor {
+	position: relative !important;
+}
+
+/* ─── Floating "+" Trigger ────────────────────────────────── */
+
+.dt-floating-trigger {
+	position: absolute;
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 1.5px dashed var(--interactive-accent);
+	border-radius: 6px;
+	background: var(--background-primary);
+	color: var(--interactive-accent);
+	cursor: pointer;
+	opacity: 0.4;
+	transition: opacity 0.15s, transform 0.15s, background 0.15s,
+	            border-style 0.15s, box-shadow 0.15s;
+	pointer-events: auto;
+}
+.dt-floating-trigger:hover {
+	opacity: 1;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-style: solid;
+	transform: scale(1.15);
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* ─── Popup Menu ──────────────────────────────────────────── */
+
+.dt-floating-menu {
+	position: absolute;
+	z-index: 101;
+	display: none;
+	min-width: 130px;
+	padding: 4px 0;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+	opacity: 0;
+	transform: translateY(-4px) scale(0.96);
+	transition: opacity 0.15s, transform 0.15s;
+}
+.dt-floating-menu--visible {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+}
+.dt-floating-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 14px;
+	cursor: pointer;
+	color: var(--text-normal);
+	font-size: 13px;
+	border-radius: 4px;
+	margin: 2px 4px;
+	transition: background 0.1s;
+}
+.dt-floating-menu-item:hover {
+	background: var(--background-modifier-hover);
+}
+.dt-floating-menu-icon {
+	display: flex;
+	align-items: center;
+	color: var(--text-muted);
+}
+.dt-floating-menu-item:hover .dt-floating-menu-icon {
+	color: var(--interactive-accent);
+}
+
+/* ─── Column Container ────────────────────────────────────── */
+
+.dt-wrapper {
+	margin: 16px 0;
+	/* Live Preview 下避免被 CM 透明命中层盖住，点击误判成「编辑源码」导致整块变回 ``` 代码 */
+	position: relative;
+	z-index: 12;
+	isolation: isolate;
+}
+.dt-container {
+	display: flex;
+	gap: 0;
+	align-items: stretch;
+	width: 100%;
+	min-height: 80px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	overflow: visible;
+	background: var(--background-primary);
+	position: relative;
+}
+
+/* ─── Column Count Badge ──────────────────────────────────── */
+
+.dt-column-count {
+	position: absolute;
+	top: 0px;
+	right: -6px;
+	padding: 1px 7px;
+	font-size: 11px;
+	line-height: 18px;
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 9px;
+	pointer-events: auto;
+	z-index: 13;
+	font-family: var(--font-monospace);
+}
+.dt-column-count--full {
+	color: var(--text-on-accent);
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+}
+
+/* ─── Individual Column ───────────────────────────────────── */
+
+.dt-column {
+	flex: 1;
+	min-width: 60px;
+	min-height: 80px;
+	padding: 12px 16px;
+	position: relative;
+	border-right: 1px dashed var(--background-modifier-border);
+	transition: background 0.15s;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	overflow: auto;
+	outline: none;
+}
+.dt-column:last-of-type {
+	border-right: none;
+}
+
+/* ── Text Column ── */
+
+.dt-column--text {
+	cursor: text;
+	caret-color: var(--text-normal);
+	white-space: pre-wrap;
+	line-height: 1.65;
+	color: var(--text-normal);
+}
+.dt-column--text:focus {
+	background: color-mix(in srgb, var(--interactive-accent) 4%, transparent);
+}
+.dt-column--text:focus.dt-column--selected {
+	background-color: rgba(167, 139, 250, 0.15) !important;
+}
+
+/* ── Media Column ── */
+
+.dt-column--media {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px;
+	cursor: default;
+}
+
+/* Placeholder */
+.dt-column[data-placeholder]:empty::before {
+	content: attr(data-placeholder);
+	color: var(--text-faint);
+	font-style: italic;
+	font-size: 0.85em;
+	pointer-events: none;
+	position: absolute;
+	top: 12px;
+	left: 16px;
+	right: 16px;
+}
+
+/* Selected column feedback */
+.dt-column--selected {
+	background-color: rgba(167, 139, 250, 0.15) !important;
+	box-shadow: inset 0 0 0 2px rgba(167, 139, 250, 0.4);
+	transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Drag-over feedback */
+.dt-column--dragover {
+	background: color-mix(in srgb, var(--interactive-accent) 8%, transparent) !important;
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -3px;
+}
+
+/* ─── Image in Column ─────────────────────────────────────── */
+
+.dt-media-img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 6px;
+	display: block;
+	object-fit: contain;
+	margin: 4px 0;
+	user-select: none;
+	cursor: pointer;
+	transition: box-shadow 0.15s ease, outline-color 0.15s ease;
+}
+
+.dt-media-img.dt-media--selected,
+.dt-video-thumb.dt-media--selected {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+	box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.28);
+}
+
+.dt-media-fallback {
+	color: var(--text-faint);
+	font-size: 0.85em;
+	font-style: italic;
+	text-align: center;
+	padding: 12px;
+}
+
+/* ─── Remote image wrap & download button ────────────────── */
+
+.dt-stray-fence-hidden {
+	display: none !important;
+	height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	overflow: hidden !important;
+	border: none !important;
+}
+
+.dt-img-toolbar-wrap {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+	margin: 4px 0;
+	border-radius: 6px;
+	user-select: none;
+	vertical-align: top;
+}
+.dt-img-toolbar-wrap > .dt-media-img {
+	margin: 0;
+	display: block;
+}
+
+.dt-img-download-btn {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(20, 20, 24, 0.72);
+	color: #fff;
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	border-radius: 6px;
+	cursor: pointer;
+	opacity: 0.9;
+	transform: translateY(0);
+	transition: opacity 0.18s ease, transform 0.18s ease,
+	            background 0.15s ease;
+	z-index: 5;
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	pointer-events: auto;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.dt-img-toolbar-wrap:hover .dt-img-download-btn {
+	opacity: 1;
+}
+.dt-img-download-btn:focus-visible {
+	opacity: 1;
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.dt-img-download-btn:hover {
+	background: rgb(218, 206, 255);
+	border-color: rgba(255, 255, 255, 0.45);
+}
+.dt-img-download-btn:active {
+	transform: scale(0.94);
+}
+
+/* ─── Video Thumbnail ─────────────────────────────────────── */
+
+.dt-video-thumb {
+	position: relative;
+	width: 100%;
+	cursor: pointer;
+	border-radius: 6px;
+	overflow: hidden;
+	background: #000;
+}
+.dt-video-thumb:hover .dt-video-play-btn {
+	transform: translate(-50%, -50%) scale(1.1);
+	opacity: 1;
+}
+
+.dt-video-preview {
+	width: 100%;
+	height: auto;
+	display: block;
+	border-radius: 6px;
+	pointer-events: none;
+}
+
+.dt-video-play-btn {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 56px;
+	height: 56px;
+	background: rgba(0, 0, 0, 0.55);
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0.8;
+	transition: transform 0.2s, opacity 0.2s;
+	pointer-events: none;
+}
+.dt-video-play-btn svg {
+	margin-left: 3px;
+}
+
+/* ─── Video Overlay Player ────────────────────────────────── */
+
+.dt-video-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background: rgba(0, 0, 0, 0.75);
+	z-index: 9999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	animation: dt-fade-in 0.2s ease;
+}
+
+@keyframes dt-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.dt-video-player-wrap {
+	position: relative;
+	max-width: 90vw;
+	max-height: 85vh;
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dt-video-player {
+	display: block;
+	max-width: 90vw;
+	max-height: 85vh;
+	border-radius: 12px;
+}
+
+.dt-video-close {
+	position: absolute;
+	top: 8px;
+	right: 12px;
+	font-size: 28px;
+	color: white;
+	cursor: pointer;
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.5);
+	border-radius: 50%;
+	transition: background 0.15s;
+	line-height: 1;
+}
+.dt-video-close:hover {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Inter-column Inserter ───────────────────────────────── */
+
+.dt-inserter {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 0;
+	position: relative;
+	z-index: 10;
+	flex-shrink: 0;
+}
+.dt-inserter::before {
+	content: "";
+	position: absolute;
+	/* 曾用 32px：热区侵入左右两栏，用户在第二栏顶部点击常会点到此处，事件未进 .dt-column 而落到编辑器 → 预览坍缩为源码 */
+	width: 12px;
+	height: 100%;
+	min-height: 80px;
+	left: -6px;
+	top: 0;
+	cursor: pointer;
+}
+
+.dt-inserter-line {
+	position: absolute;
+	width: 2px;
+	height: 0;
+	background: var(--interactive-accent);
+	border-radius: 1px;
+	opacity: 0;
+	transition: height 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+	            opacity 0.15s;
+	pointer-events: none;
+	z-index: 10;
+}
+.dt-inserter:hover .dt-inserter-line {
+	height: 80%;
+	opacity: 0.5;
+}
+
+.dt-inserter-btn {
+	position: absolute;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 1.5px solid var(--interactive-accent);
+	border-radius: 50%;
+	background: var(--background-primary);
+	color: var(--interactive-accent);
+	cursor: pointer;
+	opacity: 0;
+	transform: scale(0.4);
+	transition: opacity 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+	            transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+	            background 0.15s, color 0.15s, box-shadow 0.15s;
+	z-index: 11;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.dt-inserter:hover .dt-inserter-btn {
+	opacity: 1;
+	transform: scale(1);
+}
+.dt-inserter-btn:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	transform: scale(1.25) !important;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Dark theme ──────────────────────────────────────────── */
+
+.theme-dark .dt-container {
+	border-color: var(--background-modifier-border);
+}
+.theme-dark .dt-inserter-btn {
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+.theme-dark .dt-floating-menu {
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.theme-dark .dt-column-count {
+	background: var(--background-primary-alt);
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 500px) {
+	.dt-container {
+		flex-direction: column;
+	}
+	.dt-column {
+		border-right: none;
+		border-bottom: 1px dashed var(--background-modifier-border);
+	}
+	.dt-column:last-of-type {
+		border-bottom: none;
+	}
+	.dt-inserter {
+		width: 100%;
+		height: 0;
+	}
+	.dt-inserter::before {
+		width: 100%;
+		height: 32px;
+		left: 0;
+		top: -16px;
+		min-height: unset;
+	}
+}
