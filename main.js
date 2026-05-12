@@ -18,7 +18,7 @@ var COL_SEP = "|||";
 var NEWLINE_TOKEN = "<br>";
 
 /** 与 manifest.json 同步，便于启动提示与自检 */
-var DT_COLUMNS_VER = "2.3.5";
+var DT_COLUMNS_VER = "2.3.6";
 
 /* =============================================================
    Helpers
@@ -446,7 +446,12 @@ var DingTalkColumnsPlugin = (function (_super) {
 			try { window.removeEventListener("paste", _pasteRouteHook, true); } catch (t6) {}
 		});
 
-		installDtColumnWindowDropCapture(_this);
+		/* v2.3.6 回滚：window 捕获阶段统一接管 drop 在 PNG 这一类格式上会失败
+		 * （现象：花瓣网 PNG / 本地 PNG 都拖不进，JPG/WebP 正常）。
+		 * 暂时关掉 window 捕获，drop 改回挂在 .dt-column 自身（见 bindDragDrop），
+		 * 走旧版 v2.2.7 的顺序判断；代价是 v2.3.1 之前那条 Bug 1
+		 * 「首次拖入本地/下载图片可能无反应、需要重试一次」可能复现。 */
+		// installDtColumnWindowDropCapture(_this);
 
 		/* R2-6：mousemove 高频，rAF 节流；只在下一帧统一同步坐标 */
 		this.registerDomEvent(document, "mousemove", function (ev) {
@@ -2073,9 +2078,11 @@ function installDtColumnWindowDropCapture(plugin) {
 }
 
 function bindDragDrop(col, columns, colIdx, wrapperEl, plugin) {
-	/* dragenter：仅负责声明可投放 + 清空「笔记内拖拽」残留状态（否则会吃掉花瓣第一次 drop）。
-	 * 高亮只挂在 dragover，避免穿过子节点时 dragenter/dragleave 交替造成闪烁。
-	 * 实际 drop 在 window 捕获阶段处理（installDtColumnWindowDropCapture）。 */
+	/* v2.3.6 回滚：drop 重新挂在 .dt-column 自身、走旧版 v2.2.7 的顺序判断。
+	 * 之前 v2.3.x 把 drop 移到 window 捕获 + 加了 dataTransferLooksExternal /
+	 * isInternalWikilinkRef 双重判断，导致花瓣网 PNG（URL 干净 .png 结尾、
+	 * dataTransfer 同时带 files+html+uri-list）以及本地 PNG 文件都拖不进，
+	 * JPG/WebP 反而能进。这里去掉那两层判断，恢复旧版「顺序兜底」。 */
 	col.addEventListener("dragenter", function (e) {
 		e.preventDefault(); e.stopPropagation();
 		resetInternalDragStateIfExternal(e.dataTransfer);
@@ -2092,6 +2099,135 @@ function bindDragDrop(col, columns, colIdx, wrapperEl, plugin) {
 			if (related && col.contains(related)) return;
 		} catch (e2) {}
 		col.classList.remove("dt-column--dragover");
+	});
+
+	col.addEventListener("drop", function (e) {
+		e.preventDefault(); e.stopPropagation();
+		col.classList.remove("dt-column--dragover");
+
+		var dt = e.dataTransfer;
+		if (!dt) return;
+
+		/* 让后续 buildContainer 真正重建出新格子（沿用 v2.3.x 的修复）。 */
+		wrapperEl._dtSkipRebuild = false;
+		if (_syncTimer) {
+			try { clearTimeout(_syncTimer); } catch (eT) {}
+			_syncTimer = null;
+		}
+
+		var capturedRef = _dragSession.ref;
+		var capturedFn = _dragSession.fileName;
+		var capturedLine = _dragSession.line;
+		var capturedRaw = _dragSession.raw;
+		clearDragSession();
+
+		/* 1) 笔记内拖放（dragstart 时已捕获 wikilink） */
+		if (capturedRef) {
+			appendToColumn(columns, colIdx, capturedRef);
+			buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+			debouncedSync(wrapperEl);
+			focusColumnAtEnd(wrapperEl, colIdx);
+			scheduleErase(plugin, capturedLine, capturedRaw, capturedFn);
+			return;
+		}
+
+		var plain = (dt.getData("text/plain") || "").trim();
+
+		/* 2) text/plain 直接是本地 wikilink */
+		if (plain) {
+			var mediaRef = parseMediaRef(plain);
+			if (mediaRef && !mediaRef.isUrl) {
+				appendToColumn(columns, colIdx, plain);
+				buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+				debouncedSync(wrapperEl);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				scheduleErase(plugin, capturedLine, capturedRaw,
+					capturedFn || getBaseName(normalizeName(mediaRef.file)));
+				return;
+			}
+		}
+
+		/* 3) 系统 / 资源管理器 / 浏览器拖入文件 —— 关键路径，PNG 一直走这里 */
+		var droppedFile = getDroppedFileFromDataTransfer(dt);
+		if (droppedFile) {
+			handleFileDrop(col, droppedFile, columns, colIdx, wrapperEl, plugin,
+				capturedLine, capturedRaw, capturedFn);
+			return;
+		}
+
+		/* 4) 浏览器拖入图片：HTML 中的 <img> */
+		var html = dt.getData("text/html");
+		var imgFromHtml = html ? extractImageFromHtml(html) : null;
+		if (imgFromHtml) {
+			if (/^data:image\//i.test(imgFromHtml)) {
+				handleDataUriImage(imgFromHtml, columns, colIdx, wrapperEl, plugin);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				return;
+			}
+			if (/^https?:\/\//i.test(imgFromHtml)) {
+				insertRemoteMedia(imgFromHtml, columns, colIdx, wrapperEl, plugin);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				return;
+			}
+		}
+
+		/* 5) text/uri-list */
+		var uriList = (dt.getData("text/uri-list") || "")
+			.split(/\r?\n/)
+			.filter(function (s) { return s && !s.startsWith("#"); });
+		var firstUri = uriList[0] || "";
+		if (firstUri && /^https?:\/\//i.test(firstUri)) {
+			var refUri = parseMediaRef(firstUri);
+			if (refUri && refUri.isUrl) {
+				insertRemoteMedia(refUri.file, columns, colIdx, wrapperEl, plugin);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				return;
+			}
+			appendToColumn(columns, colIdx, firstUri);
+			buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+			debouncedSync(wrapperEl);
+			focusColumnAtEnd(wrapperEl, colIdx);
+			var mdViewU = plugin.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+			var targetFileU = mdViewU && mdViewU.file ? mdViewU.file : null;
+			maybeUpgradeUrlToImageInBackground(plugin, firstUri, targetFileU);
+			return;
+		}
+
+		/* 6) text/plain 兜底（URL / data: / 普通文本） */
+		if (plain) {
+			if (/^data:image\//i.test(plain)) {
+				handleDataUriImage(plain, columns, colIdx, wrapperEl, plugin);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				return;
+			}
+			var mediaRef2 = parseMediaRef(plain);
+			if (mediaRef2 && mediaRef2.isUrl) {
+				insertRemoteMedia(mediaRef2.file, columns, colIdx, wrapperEl, plugin);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				return;
+			}
+			if (mediaRef2) {
+				appendToColumn(columns, colIdx, plain);
+				buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+				debouncedSync(wrapperEl);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				return;
+			}
+			if (isExternalUrl(plain) && !/\s/.test(plain)) {
+				appendToColumn(columns, colIdx, plain);
+				buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+				debouncedSync(wrapperEl);
+				focusColumnAtEnd(wrapperEl, colIdx);
+				var mdViewP = plugin.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+				var targetFileP = mdViewP && mdViewP.file ? mdViewP.file : null;
+				maybeUpgradeUrlToImageInBackground(plugin, plain, targetFileP);
+				return;
+			}
+			appendToColumn(columns, colIdx, plain);
+			buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+			debouncedSync(wrapperEl);
+			focusColumnAtEnd(wrapperEl, colIdx);
+		}
 	});
 }
 
