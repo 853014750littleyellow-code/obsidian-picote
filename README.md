@@ -43,8 +43,8 @@
 
 **所含文件**：`main.js`、`manifest.json`  
 
-**Bug 11：两栏分别放入多张图片（≈7 张）后，分栏下方仍漏出一行 ```**  
-原 `MutationObserver` 挂在 `.cm-embed-block`，但 Live Preview 下闭合 ``` 经常被渲染成**外层 `.cm-content` 的另一条 `.cm-line`**，观察器收不到通知；多图加载又超出原本 1.4s 的兜底延时窗口。  
+**Bug 11：两栏分别放入多张图片（≈7 张）后，分栏下方仍漏出一行「三个点」（闭合围栏）**  
+原 `MutationObserver` 挂在 `.cm-embed-block`，但 Live Preview 下闭合围栏（三个反引号）经常被渲染成**外层 `.cm-content` 的另一条 `.cm-line`**，观察器收不到通知；多图加载又超出原本 1.4s 的兜底延时窗口。  
 **处理**：观察器改挂 `.cm-content` / `.markdown-preview-section`，加 `requestAnimationFrame` 节流并去掉昂贵的 `characterData`；新增 `bindMediaLoadFenceCleanup`，每张 `<img>` / `<video>` 的 `load / loadeddata / error` 都触发清理，与图片就绪时刻对齐；`scheduleCleanupStrayFences` 延时档位由 8 档延伸到 10 档（追加 2200 / 3600ms），覆盖慢网或远程图最长尾。
 
 **面向社区目录的内部整理**（不影响功能）：  
@@ -90,7 +90,7 @@ v2.3.1 起在 `window` 捕获阶段拦截分栏上的 `dragover` / `drop`，部�
 
 **所含文件**：`main.js`、`manifest.json`  
 
-**Bug 9：视频 + 文字分栏下，底下仍露出单独一行 ```**  
+**Bug 9：视频 + 文字分栏下，底下仍露出单独一行闭合围栏（「三个点」）**  
 原判断过严、扫描步数与邻接关系不够，且视频加载后 DOM 二次重拍发生在固定延时之后，清理逻辑碰不到。  
 **处理**：按「整行是否为纯围栏」放宽判断并跳过插件自身容器；扩大向上回溯与扫描步数；用 **MutationObserver** 补齐异步重排；延时档位加密并叠加 `requestAnimationFrame`。
 
@@ -132,7 +132,7 @@ v2.3.1 起在 `window` 捕获阶段拦截分栏上的 `dragover` / `drop`，部�
 - **Bug 2**：`<div><br></div>` 序列化多出空行 → **`serializeColumnContent`** 区分空块与单媒体块。  
 - **Bug 3**：IME 期间防抖写回打断组字 → **composition** 门禁 + 失焦轮询等待。  
 - **Bug 4**：点分栏误入代码块视图 → **z-index / isolation**，收窄 `.dt-inserter` 热区，事件 **`stopPropagation`**。  
-- **Bug 5**：闭合围栏单独成行的「假 ```」→ **`cleanupStrayFenceNearWrapper`**（可能误伤分栏外故意写的单独围栏，属权衡）。
+- **Bug 5**：闭合围栏单独成行的「假三个点」→ **`cleanupStrayFenceNearWrapper`**（可能误伤分栏外故意写的单独围栏，属权衡）。
 
 ---
 
