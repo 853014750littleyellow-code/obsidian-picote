@@ -57,6 +57,21 @@
 
 ---
 
+### [2.3.6] — 2026-05-12
+
+**类型**：稳定性 / 拖放修复  
+
+**所含文件**：`main.js`、`manifest.json`  
+
+**回滚 window 捕获 drop，修复 PNG 等图片拖入失败**  
+v2.3.1 起在 `window` 捕获阶段拦截分栏上的 `dragover` / `drop`，部分环境下 Obsidian 与分栏逻辑冲突，导致 **PNG 等格式拖入分栏无反应**（文件可能已进库但预览不更新）。  
+**处理**：禁用 `installDtColumnWindowDropCapture`，`drop` 重新挂在 `.dt-column` 上，并恢复 v2.2.7 的顺序兜底逻辑。  
+**权衡**：极端情况下「首次拖入」仍可能需要再拖一次（与 v2.3.1 针对 Bug 1 的 window 捕获方案互有取舍）。
+
+**文档**：同步精简 README 结构与表述（GitHub Release 说明为「Revise README for clarity and localization」）。
+
+---
+
 ### [2.3.5] — 2026-05-12
 
 **类型**：稳定性 / 交互修复  
