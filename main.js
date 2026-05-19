@@ -1,7 +1,10 @@
 /*
- * DingTalk Columns — Obsidian Plugin (v3)
+ * Picote — Obsidian Plugin
  * Pure JS, no build step, no @codemirror imports.
  * Direct contenteditable + vault resource path for media.
+ *
+ * 注：内部仍保留 "DingTalk Columns" / "dt-columns" / "DingTalkColumnsPlugin" 等历史标识，
+ * 是为了兼容用户已有笔记里的 ```dt-columns 代码块和已配置的命令快捷键，请勿轻易改动。
  */
 
 "use strict";
@@ -18,7 +21,18 @@ var COL_SEP = "|||";
 var NEWLINE_TOKEN = "<br>";
 
 /** 与 manifest.json 同步，便于启动提示与自检 */
-var DT_COLUMNS_VER = "2.3.6";
+var DT_COLUMNS_VER = "2.3.7";
+
+/** 调试日志开关：发版默认 false；开发期可临时改 true 看 dragstart / paste / erase 等链路。 */
+var DT_DEBUG = false;
+function dlog() {
+	if (!DT_DEBUG) return;
+	try { console.log.apply(console, arguments); } catch (e) {}
+}
+function dwarn() {
+	if (!DT_DEBUG) return;
+	try { console.warn.apply(console, arguments); } catch (e) {}
+}
 
 /* =============================================================
    Helpers
@@ -192,7 +206,7 @@ function insertColumnsBlock(editor, count) {
 		);
 		editor.setCursor({ line: cursor.line + 3, ch: 0 });
 	} catch (e) {
-		console.error("DingTalk Columns: insert failed", e);
+		console.error("Picote: insert failed", e);
 	}
 }
 
@@ -296,7 +310,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 				var selLine = cmv.state.doc.lineAt(sel.from);
 				if (parseMediaRef(selLine.text.trim())) {
 					captureLine(selLine);
-					console.log("DT-Columns dragstart [sel] line:", _dragSession.line, _dragSession.ref);
+					dlog("Picote dragstart [sel] line:", _dragSession.line, _dragSession.ref);
 					return;
 				}
 			}
@@ -307,7 +321,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 					var posLine = cmv.state.doc.lineAt(pos);
 					if (parseMediaRef(posLine.text.trim())) {
 						captureLine(posLine);
-						console.log("DT-Columns dragstart [pos] line:", _dragSession.line, _dragSession.ref);
+						dlog("Picote dragstart [pos] line:", _dragSession.line, _dragSession.ref);
 						return;
 					}
 				}
@@ -331,7 +345,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 						if (lnText.startsWith("```")) { inB = !inB; continue; }
 						if (!inB && fnRegex.test(lnText)) {
 							captureLine(cmL);
-							console.log("DT-Columns dragstart [img] line:", _dragSession.line, _dragSession.ref);
+							dlog("Picote dragstart [img] line:", _dragSession.line, _dragSession.ref);
 							return;
 						}
 					}
@@ -366,12 +380,12 @@ var DingTalkColumnsPlugin = (function (_super) {
 						if (vlnText.startsWith("```")) { vinB = !vinB; continue; }
 						if (!vinB && vfnRegex.test(vlnText)) {
 							captureLine(vcmL);
-							console.log("DT-Columns dragstart [video] line:", _dragSession.line, _dragSession.ref);
+							dlog("Picote dragstart [video] line:", _dragSession.line, _dragSession.ref);
 							return;
 						}
 					}
 					beginDragSession("![[" + vfn + "]]", getBaseName(vfn), -1, "");
-					console.log("DT-Columns dragstart [video-fallback] ref:", _dragSession.ref);
+					dlog("Picote dragstart [video-fallback] ref:", _dragSession.ref);
 				}
 			}
 		});
@@ -391,7 +405,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 			var tyList = cb.types ? Array.from(cb.types) : [];
 			if (cb.files && cb.files.length > 0) {
 				try {
-					console.info("[DingTalk Columns] clipboard: files=", cb.files.length);
+					dlog("[Picote] clipboard: files=", cb.files.length);
 				} catch (t0) {}
 			}
 
@@ -401,7 +415,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 					var s = String(t).toLowerCase();
 					return s.indexOf("image") >= 0 || s.indexOf("html") >= 0;
 				})) {
-					console.info("[DingTalk Columns] paste event | types=", JSON.stringify(tyList),
+					dlog("[Picote] paste event | types=", JSON.stringify(tyList),
 						" mediaLike=", looksRich,
 						" target=", tgt && tgt.nodeName ? tgt.nodeName : "?");
 				}
@@ -417,7 +431,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 			var col = resolveTargetColumnForPaste();
 			if (!col) {
 				try {
-					console.warn("[DingTalk Columns] 检测到图片类剪贴板，但没找到目标分栏。"
+					dwarn("[Picote] 检测到图片类剪贴板，但没找到目标分栏。"
 						+ "请先「用鼠标点在分栏里」再 Ctrl+V（不要先在开发者工具里按粘贴）");
 				} catch (t2) {}
 				return;
@@ -425,7 +439,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 
 			var wrap = findDtWrapperElement(col);
 			if (!wrap || wrap._dtColumns == null || !wrap._dtPlugin) {
-				try { console.warn("[DingTalk Columns] 找不到分栏 wrapper/_dtColumns"); } catch (t4) {}
+				try { dwarn("[Picote] 找不到分栏 wrapper/_dtColumns"); } catch (t4) {}
 				return;
 			}
 
@@ -436,7 +450,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 			try { e.stopImmediatePropagation(); } catch (stopE) { e.stopPropagation(); }
 
 			try {
-				console.info("[DingTalk Columns] → 转发到 column #" + (idx + 1));
+				dlog("[Picote] → 转发到 column #" + (idx + 1));
 			} catch (t5) {}
 
 			processPasteIntoColumn(cb, wrap._dtColumns, idx, wrap, wrap._dtPlugin);
@@ -493,7 +507,8 @@ var DingTalkColumnsPlugin = (function (_super) {
 	DingTalkColumnsPlugin.prototype.onunload = function () {
 		if (this._floatingEl && this._floatingEl.parentNode) this._floatingEl.remove();
 		if (this._menuEl && this._menuEl.parentNode) this._menuEl.remove();
-		if (this._outsideHandler) document.removeEventListener("mousedown", this._outsideHandler);
+		/* _outsideHandler 已由 registerDomEvent 注册，Obsidian 会在卸载时自动移除，
+		 * 这里不再手动 removeEventListener，避免重复清理。 */
 	};
 
 	DingTalkColumnsPlugin.prototype._createFloatingUI = function () {
@@ -542,7 +557,8 @@ var DingTalkColumnsPlugin = (function (_super) {
 				_this._hideMenu();
 			}
 		};
-		document.addEventListener("mousedown", this._outsideHandler);
+		/* 用 Obsidian 注册器：onunload 时由框架自动清理，符合社区插件风格指南 */
+		this.registerDomEvent(document, "mousedown", this._outsideHandler);
 	};
 
 	DingTalkColumnsPlugin.prototype._attach = function () {
@@ -791,7 +807,7 @@ function diagnoseDtColumnsClipboard() {
 			rows.push("你最近点过分栏：" + sec + " 秒内有效 ✓");
 		} else rows.push("请先「在某一栏里点一下」再运行本检查");
 	} catch (e4) {}
-	try { console.info("DTC diagn\n" + rows.join("\n")); } catch (e6) {}
+	try { dlog("Picote diagn\n" + rows.join("\n")); } catch (e6) {}
 	try {
 		new obsidian.Notice(rows.join("\n"), 22000);
 	} catch (e5) {}
@@ -1110,37 +1126,83 @@ function cleanupStrayFenceNearWrapper(wrapperEl) {
 /**
  * 在 wrapper 父级挂 MutationObserver，无论 CM 何时把闭合围栏渲染出来都能秒杀。
  * 同一个 wrapper 只挂一次；wrapper 自身离开 DOM 时自动解绑。
+ *
+ * Bug 11 修复：旧版优先挂 `.cm-embed-block`，但 Live Preview 下闭合 ``` 常被渲染成
+ * **外层 .cm-content 的另一条 .cm-line**（即 .cm-embed-block 之外），观察器看不到，
+ * 多图大 codeblock 下「下方多三个点」的体验就会反复出现。
+ * 这里改为优先挂到 .cm-content / .markdown-preview-section（覆盖整个编辑/预览区），
+ * 用 requestAnimationFrame 节流避免每次输入都跑全量扫描，并去掉昂贵的 characterData。
  */
 function ensureStrayFenceObserver(wrapperEl) {
 	if (!wrapperEl) return;
 	if (wrapperEl._dtStrayObserver) return;
 
 	var target =
+		(wrapperEl.closest && wrapperEl.closest(".cm-content, .markdown-preview-section, .markdown-preview-view")) ||
+		(wrapperEl.closest && wrapperEl.closest(".cm-editor")) ||
 		(wrapperEl.closest && wrapperEl.closest(".cm-embed-block")) ||
 		wrapperEl.parentElement ||
-		(wrapperEl.closest && wrapperEl.closest(".cm-editor, .markdown-preview-section")) ||
 		document.body;
 	if (!target) return;
 
 	try {
+		var pending = false;
 		var obs = new MutationObserver(function () {
 			if (!wrapperEl.isConnected) {
 				try { obs.disconnect(); } catch (eD) {}
 				wrapperEl._dtStrayObserver = null;
 				return;
 			}
-			cleanupStrayFenceNearWrapper(wrapperEl);
+			if (pending) return;
+			pending = true;
+			try {
+				requestAnimationFrame(function () {
+					pending = false;
+					cleanupStrayFenceNearWrapper(wrapperEl);
+				});
+			} catch (eRaf) {
+				pending = false;
+				cleanupStrayFenceNearWrapper(wrapperEl);
+			}
 		});
-		obs.observe(target, { childList: true, subtree: true, characterData: true });
+		obs.observe(target, { childList: true, subtree: true });
 		wrapperEl._dtStrayObserver = obs;
 	} catch (e) {}
 }
 
+/**
+ * Bug 11 修复：多图 codeblock 下，图片加载 / 解码常常晚于现有 1.4s 延时档位完成，
+ * 等 CM 把闭合 ``` 重排出来时，所有 setTimeout 都已经跑完。
+ * 这里给 wrapper 内每张 <img> 挂一次 load/error，触发追加扫描，把延时窗口与「图片就绪时刻」对齐。
+ * 已挂过 _dtStrayHooked 的 img 不重复挂。
+ */
+function bindMediaLoadFenceCleanup(wrapperEl) {
+	if (!wrapperEl || !wrapperEl.querySelectorAll) return;
+	var nodes = wrapperEl.querySelectorAll("img, video");
+	for (var i = 0; i < nodes.length; i++) {
+		(function (node) {
+			if (node._dtStrayHooked) return;
+			node._dtStrayHooked = true;
+			var fire = function () {
+				if (!wrapperEl.isConnected) return;
+				cleanupStrayFenceNearWrapper(wrapperEl);
+			};
+			node.addEventListener("load", fire);
+			node.addEventListener("loadeddata", fire);
+			node.addEventListener("error", fire);
+			/* 已经加载完的图片不会再触发 load，立即追一次 */
+			if (node.tagName === "IMG" && node.complete) {
+				try { requestAnimationFrame(fire); } catch (eR) { fire(); }
+			}
+		})(nodes[i]);
+	}
+}
+
 function scheduleCleanupStrayFences(wrapperEl) {
 	if (!wrapperEl) return;
-	/* 立即跑一次 + 多档延时兜住 CM 异步重排 */
+	/* 立即跑一次 + 多档延时兜住 CM 异步重排（多图场景需要更长尾巴）*/
 	cleanupStrayFenceNearWrapper(wrapperEl);
-	var delays = [0, 24, 64, 140, 280, 520, 880, 1400];
+	var delays = [0, 24, 64, 140, 280, 520, 880, 1400, 2200, 3600];
 	for (var di = 0; di < delays.length; di++) {
 		(function (ms) {
 			setTimeout(function () {
@@ -1155,6 +1217,8 @@ function scheduleCleanupStrayFences(wrapperEl) {
 	} catch (eR) {}
 	/* 长期监听：之后任何 DOM 改动（拖图、删图、滚动到视口、CM 重排）都会自动复查 */
 	ensureStrayFenceObserver(wrapperEl);
+	/* 跟随媒体加载节奏再扫，兜住「7 张图都加载完才出现 ``` 」的迟到场景 */
+	bindMediaLoadFenceCleanup(wrapperEl);
 }
 
 /* =============================================================
@@ -2264,7 +2328,7 @@ function findAndErase(plugin, srcLine, srcRaw, searchFn) {
 		var currentText = stripInvisible(editor.getLine(srcLine).trim());
 		var expectedText = stripInvisible(srcRaw.trim());
 		if (currentText === expectedText && currentText.length > 0) {
-			console.log("DT-Columns erase: exact line match at", srcLine);
+			dlog("Picote erase: exact line match at", srcLine);
 			eraseLineFromEditor(editor, srcLine);
 			return true;
 		}
@@ -2274,7 +2338,7 @@ function findAndErase(plugin, srcLine, srcRaw, searchFn) {
 			if (above >= 0) {
 				var aboveText = stripInvisible(editor.getLine(above).trim());
 				if (aboveText === expectedText && aboveText.length > 0) {
-					console.log("DT-Columns erase: found at", above, "(shifted -" + d + ")");
+					dlog("Picote erase: found at", above, "(shifted -" + d + ")");
 					eraseLineFromEditor(editor, above);
 					return true;
 				}
@@ -2282,7 +2346,7 @@ function findAndErase(plugin, srcLine, srcRaw, searchFn) {
 			if (below < total) {
 				var belowText = stripInvisible(editor.getLine(below).trim());
 				if (belowText === expectedText && belowText.length > 0) {
-					console.log("DT-Columns erase: found at", below, "(shifted +" + d + ")");
+					dlog("Picote erase: found at", below, "(shifted +" + d + ")");
 					eraseLineFromEditor(editor, below);
 					return true;
 				}
@@ -2298,7 +2362,7 @@ function findAndErase(plugin, srcLine, srcRaw, searchFn) {
 				var lt = stripInvisible(editor.getLine(i).trim());
 				if (lt.startsWith("```")) { inBlock = !inBlock; continue; }
 				if (!inBlock && lt === expectedFull) {
-					console.log("DT-Columns erase: full-text match at line", i);
+					dlog("Picote erase: full-text match at line", i);
 					eraseLineFromEditor(editor, i);
 					return true;
 				}
@@ -2313,32 +2377,32 @@ function findAndErase(plugin, srcLine, srcRaw, searchFn) {
 			var lt2 = stripInvisible(editor.getLine(j).trim());
 			if (lt2.startsWith("```")) { inBlock2 = !inBlock2; continue; }
 			if (!inBlock2 && regex.test(lt2)) {
-				console.log("DT-Columns erase: regex match at line", j, ":", lt2);
+				dlog("Picote erase: regex match at line", j, ":", lt2);
 				eraseLineFromEditor(editor, j);
 				return true;
 			}
 		}
 	}
 
-	console.log("DT-Columns erase: nothing found. srcLine:", srcLine, "srcRaw:", srcRaw, "searchFn:", searchFn);
+	dlog("Picote erase: nothing found. srcLine:", srcLine, "srcRaw:", srcRaw, "searchFn:", searchFn);
 	return false;
 }
 
 function scheduleErase(plugin, srcLine, srcRaw, searchFn) {
 	setTimeout(function () {
 		var ok = findAndErase(plugin, srcLine, srcRaw, searchFn);
-		console.log("DT-Columns pass1 (200ms):", ok ? "DELETED" : "not found");
+		dlog("Picote pass1 (200ms):", ok ? "DELETED" : "not found");
 	}, 200);
 
 	setTimeout(function () {
 		var ok = findAndErase(plugin, srcLine, srcRaw, searchFn);
 		if (ok) {
-			console.log("DT-Columns pass2 (700ms): DELETED leftover");
+			dlog("Picote pass2 (700ms): DELETED leftover");
 			try {
 				plugin.app.commands.executeCommandById("editor:save-file");
 			} catch (e) {}
 		} else {
-			console.log("DT-Columns pass2 (700ms): clean");
+			dlog("Picote pass2 (700ms): clean");
 		}
 	}, 700);
 }
@@ -2385,7 +2449,7 @@ function handleFileDrop(col, file, columns, colIdx, wrapperEl, plugin, srcLine, 
 			var fn = srcFn || getBaseName(normalizeName(file.name));
 			scheduleErase(plugin, srcLine, srcRaw, fn);
 		} catch (e) {
-			console.error("DingTalk Columns: drop failed", e);
+			console.error("Picote: drop failed", e);
 		}
 	};
 	reader.readAsArrayBuffer(file);
@@ -2736,7 +2800,7 @@ async function fetchRemoteMediaResp(url) {
 		}
 		return resp;
 	} catch (e) {
-		console.warn("DingTalk Columns: requestUrl threw", e);
+		console.warn("Picote: requestUrl threw", e);
 		return null;
 	}
 }
@@ -2745,7 +2809,7 @@ async function downloadRemoteMediaToVault(plugin, url) {
 	try {
 		var resp = await fetchRemoteMediaResp(url);
 		if (!resp || resp.status < 200 || resp.status >= 300) {
-			console.warn("DingTalk Columns: remote download failed status=", resp && resp.status, url);
+			console.warn("Picote: remote download failed status=", resp && resp.status, url);
 			return null;
 		}
 		var ab = resp.arrayBuffer;
@@ -2761,7 +2825,7 @@ async function downloadRemoteMediaToVault(plugin, url) {
 		var ctLower = (contentType || "").toLowerCase();
 		var isImageOrVideo = /^image\//.test(ctLower) || /^video\//.test(ctLower);
 		if (!isImageOrVideo && !looksLikeImageBytes(ab)) {
-			console.warn("DingTalk Columns: response is not image/video, skip. content-type=", contentType, url);
+			console.warn("Picote: response is not image/video, skip. content-type=", contentType, url);
 			return null;
 		}
 
@@ -2773,7 +2837,7 @@ async function downloadRemoteMediaToVault(plugin, url) {
 		await plugin.app.vault.createBinary(filePath, ab);
 		return { name: safeName, path: filePath, isVideo: isVideoMime(contentType) || /^(mp4|webm|ogg|mov|mkv)$/i.test(ext) };
 	} catch (e) {
-		console.error("DingTalk Columns: download error", e);
+		console.error("Picote: download error", e);
 		return null;
 	}
 }
@@ -2811,7 +2875,7 @@ function replaceInEditorByText(editor, oldText, newText) {
 			}
 		}
 	} catch (e) {
-		console.error("DingTalk Columns: editor replace failed", e);
+		console.error("Picote: editor replace failed", e);
 	}
 	return false;
 }
@@ -2861,7 +2925,7 @@ async function replacePlaceholderInFile(plugin, targetFile, oldText, newText) {
 		}
 		return true;
 	} catch (e) {
-		console.error("DingTalk Columns: vault modify failed", e);
+		console.error("Picote: vault modify failed", e);
 		return false;
 	}
 }
@@ -2936,7 +3000,7 @@ function downloadRemoteImageToLocal(url, rawRef, plugin) {
 			}
 		} catch (e) {
 			try { if (notice) notice.hide(); } catch (e2) {}
-			console.error("DingTalk Columns: manual download failed", e);
+			console.error("Picote: manual download failed", e);
 			var msg = (e && e.message) ? String(e.message) : String(e);
 			if (msg === "DT_TIMEOUT") msg = "下载超时（15 秒），请稍后再试";
 			try { new obsidian.Notice("下载出错：" + msg); } catch (e3) {}
@@ -3040,7 +3104,7 @@ function handleDataUriImage(dataUri, columns, colIdx, wrapperEl, plugin) {
 		var pseudoFile = new File([bytes], safeName, { type: mime });
 		handleClipboardFile(pseudoFile, columns, colIdx, wrapperEl, plugin);
 	} catch (e) {
-		console.error("DingTalk Columns: data URI parse failed", e);
+		console.error("Picote: data URI parse failed", e);
 	}
 }
 
@@ -3086,7 +3150,7 @@ function handleClipboardFile(file, columns, colIdx, wrapperEl, plugin) {
 				new obsidian.Notice("已保存图片到 assets：" + safeName + "（若未刷新请再等半秒）", 9000);
 			} catch (nFile) {}
 		} catch (e) {
-			console.error("DingTalk Columns: paste file failed", e);
+			console.error("Picote: paste file failed", e);
 		}
 	};
 	reader.readAsArrayBuffer(file);
@@ -3123,7 +3187,7 @@ function syncToSource(wrapperEl) {
 			}
 			var cmv = resolveCMViewForSync(wrapperEl);
 			if (!cmv) {
-				console.warn("DingTalk Columns: syncToSource — 仍未找到编辑器（请先打开该 md 的标签页并使用 Live Preview）");
+				console.warn("Picote: syncToSource — 仍未找到编辑器（请先打开该 md 的标签页并使用 Live Preview）");
 				return;
 			}
 			var range = null;
@@ -3139,7 +3203,7 @@ function syncToSource(wrapperEl) {
 					return;
 				}
 				try {
-					console.warn("DingTalk Columns: syncToSource — 找不到代码块范围，写回放弃。",
+					console.warn("Picote: syncToSource — 找不到代码块范围，写回放弃。",
 						"ctx=", !!wrapperEl._dtCtx, "doc.lines=", cmv.state.doc.lines);
 					new obsidian.Notice("分栏写回失败：找不到代码块位置。请重新进入笔记或检查代码块语言是否被改动。", 8000);
 				} catch (eN) {}
@@ -3162,7 +3226,7 @@ function syncToSource(wrapperEl) {
 					attempt++;
 					setTimeout(runSyncDispatch, attempt <= 22 ? 0 : Math.min(45, Math.floor(attempt / 3)));
 				} else {
-					console.error("DingTalk Columns: sync failed", err);
+					console.error("Picote: sync failed", err);
 				}
 			}
 		}
@@ -3175,7 +3239,7 @@ function syncToSource(wrapperEl) {
 			setTimeout(runSyncDispatch, 72);
 		}
 	} catch (e) {
-		console.error("DingTalk Columns: sync failed", e);
+		console.error("Picote: sync failed", e);
 	}
 }
 

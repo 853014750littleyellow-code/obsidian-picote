@@ -37,6 +37,26 @@
 
 ## 更新日志（精简）
 
+### [2.3.7] — 2026-05-19
+
+**类型**：稳定性修复 + 面向 Obsidian 社区目录的内部整理  
+
+**所含文件**：`main.js`、`manifest.json`  
+
+**Bug 11：两栏分别放入多张图片（≈7 张）后，分栏下方仍漏出一行 ```**  
+原 `MutationObserver` 挂在 `.cm-embed-block`，但 Live Preview 下闭合 ``` 经常被渲染成**外层 `.cm-content` 的另一条 `.cm-line`**，观察器收不到通知；多图加载又超出原本 1.4s 的兜底延时窗口。  
+**处理**：观察器改挂 `.cm-content` / `.markdown-preview-section`，加 `requestAnimationFrame` 节流并去掉昂贵的 `characterData`；新增 `bindMediaLoadFenceCleanup`，每张 `<img>` / `<video>` 的 `load / loadeddata / error` 都触发清理，与图片就绪时刻对齐；`scheduleCleanupStrayFences` 延时档位由 8 档延伸到 10 档（追加 2200 / 3600ms），覆盖慢网或远程图最长尾。
+
+**面向社区目录的内部整理**（不影响功能）：  
+
+- `manifest.json`：`name` 改 **`Picote`**，`description` 去句末点号，`minAppVersion` 从 `1.0.0` 提到 **`1.4.0`**。  
+- 新增 `DT_DEBUG`（默认关）+ `dlog` / `dwarn` 包装，将 16 处 `console.log` / `console.info` 静音；`console.error` / `console.warn` 不动，真错误仍可见。  
+- 所有外露日志前缀由 `DingTalk Columns` / `DT-Columns` 统一为 `Picote`。  
+- 浮窗外部点击关闭：`_outsideHandler` 由 `document.addEventListener` 改为 **`this.registerDomEvent`**，由 Obsidian 卸载时自动清理。  
+- 历史标识保留：代码块语言 `dt-columns`、命令 id `insert-dingtalk-columns`、内部类名 `DingTalkColumnsPlugin` 全部不动，与已有笔记 / 已绑快捷键严格兼容。
+
+---
+
 ### [2.3.5] — 2026-05-12
 
 **类型**：稳定性 / 交互修复  
