@@ -21,7 +21,7 @@ var COL_SEP = "|||";
 var NEWLINE_TOKEN = "<br>";
 
 /** 与 manifest.json 同步，便于启动提示与自检 */
-var DT_COLUMNS_VER = "2.3.7";
+var DT_COLUMNS_VER = "2.3.8";
 
 /** 调试日志开关：发版默认 false；开发期可临时改 true 看 dragstart / paste / erase 等链路。 */
 var DT_DEBUG = false;
@@ -394,6 +394,11 @@ var DingTalkColumnsPlugin = (function (_super) {
 			setTimeout(clearDragSession, 1500);
 		});
 
+		/* 笔记内图片单击放大（正文 + 分栏）；Shift+单击分栏内图仍可选中删除 */
+		this.registerDomEvent(document, "click", handleDocumentImageClick, true);
+		/* Esc 须在 window 捕获阶段处理，否则常被 CodeMirror / Obsidian 先吃掉 */
+		this.registerDomEvent(window, "keydown", handleImageViewerKeydown, { capture: true });
+
 		/* Live Preview：焦点常在 CodeMirror —— window 捕获阶段转发（比单独 document 更可靠）*/
 		var _pasteRouteHook = function (e) {
 			var tgt = e.target;
@@ -505,6 +510,7 @@ var DingTalkColumnsPlugin = (function (_super) {
 	};
 
 	DingTalkColumnsPlugin.prototype.onunload = function () {
+		closeImageViewer();
 		if (this._floatingEl && this._floatingEl.parentNode) this._floatingEl.remove();
 		if (this._menuEl && this._menuEl.parentNode) this._menuEl.remove();
 		/* _outsideHandler 已由 registerDomEvent 注册，Obsidian 会在卸载时自动移除，
@@ -1260,6 +1266,183 @@ function openVideoPlayer(url, plugin) {
 }
 
 /* =============================================================
+   Image lightbox — 笔记内任意图片单击放大，滚轮 / Ctrl+滚轮缩放
+   ============================================================= */
+
+var _dtImageViewer = null;
+var _dtImageViewerScale = 1;
+
+function closeImageViewer() {
+	if (_dtImageViewer) {
+		try { _dtImageViewer.remove(); } catch (e) {}
+		_dtImageViewer = null;
+	}
+	_dtImageViewerScale = 1;
+}
+
+/** 灯箱打开时：Esc 关闭（捕获阶段，避免被编辑器拦截） */
+function handleImageViewerKeydown(e) {
+	if (!_dtImageViewer) return;
+	if (e.key !== "Escape" && e.key !== "Esc" && e.keyCode !== 27) return;
+	e.preventDefault();
+	e.stopPropagation();
+	try { e.stopImmediatePropagation(); } catch (k) {}
+	closeImageViewer();
+}
+
+/**
+ * 是否应对该 <img> 启用 Picote 大图预览（正文、分栏、阅读模式均可；排除 UI 碎图）。
+ */
+function isPicoteZoomableImage(img) {
+	if (!img || img.tagName !== "IMG") return false;
+	if (img.closest(
+		".dt-floating-trigger, .dt-floating-menu, .dt-image-overlay, .dt-video-overlay, " +
+		".dt-img-download-btn, button, .modal, .workspace-tab-header, .clickable-icon, " +
+		".community-plugin-search, .setting-item"
+	)) return false;
+
+	var inContent = img.closest(
+		".markdown-preview-view, .markdown-rendered, .cm-editor, .cm-content, " +
+		".print-markdown, .popover.hover-popover, .dt-column, .dt-wrapper"
+	);
+	if (!inContent) return false;
+
+	/* 排除极小图标（分栏内媒体始终允许） */
+	if (!img.closest(".dt-column")) {
+		var rw = img.getBoundingClientRect().width;
+		var rh = img.getBoundingClientRect().height;
+		if (rw > 0 && rh > 0 && rw < 20 && rh < 20) return false;
+	}
+
+	var src = (img.currentSrc || img.src || "").trim();
+	if (!src || src.indexOf("data:image/svg") === 0) return false;
+
+	return true;
+}
+
+function openImageViewer(src, alt) {
+	if (!src) return;
+	closeImageViewer();
+
+	var scale = 1;
+	_dtImageViewerScale = 1;
+
+	var overlay = document.createElement("div");
+	overlay.className = "dt-image-overlay";
+	overlay.setAttribute("tabindex", "-1");
+	overlay.setAttribute("role", "dialog");
+	overlay.setAttribute("aria-modal", "true");
+	overlay.setAttribute("aria-label", "图片预览");
+
+	var wrap = document.createElement("div");
+	wrap.className = "dt-image-viewer-wrap";
+
+	var imgEl = document.createElement("img");
+	imgEl.className = "dt-image-viewer-img";
+	imgEl.src = src;
+	imgEl.alt = alt || "";
+	imgEl.draggable = false;
+
+	function applyScale() {
+		_dtImageViewerScale = scale;
+		imgEl.style.transform = "scale(" + scale + ")";
+	}
+
+	var hint = document.createElement("div");
+	hint.className = "dt-image-viewer-hint";
+	hint.textContent = "鼠标滚轮支持图片放大缩小";
+
+	var closeBtn = document.createElement("button");
+	closeBtn.type = "button";
+	closeBtn.className = "dt-image-viewer-close";
+	closeBtn.setAttribute("aria-label", "关闭预览，回到笔记");
+	closeBtn.title = "关闭预览";
+	closeBtn.innerHTML = "&times;";
+
+	function onWheel(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		var step = (e.ctrlKey || e.metaKey) ? 0.06 : 0.12;
+		if (e.deltaY < 0) scale = Math.min(scale + step, 8);
+		else scale = Math.max(scale - step, 0.12);
+		applyScale();
+	}
+
+	wrap.addEventListener("wheel", onWheel, { passive: false });
+	overlay.addEventListener("wheel", onWheel, { passive: false });
+	overlay.addEventListener("keydown", handleImageViewerKeydown, true);
+
+	closeBtn.addEventListener("click", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		closeImageViewer();
+	});
+
+	overlay.addEventListener("click", function (e) {
+		if (e.target === overlay) closeImageViewer();
+	});
+
+	wrap.appendChild(imgEl);
+	/* 先文案、后图片：图片层叠在文案之上（配合 styles.css 的 z-index） */
+	overlay.appendChild(hint);
+	overlay.appendChild(wrap);
+	overlay.appendChild(closeBtn);
+	document.body.appendChild(overlay);
+	_dtImageViewer = overlay;
+
+	try {
+		requestAnimationFrame(function () {
+			try { overlay.focus(); } catch (f1) {}
+			try { closeBtn.focus(); } catch (f2) {}
+		});
+	} catch (f0) {}
+
+	/* 打开时适配视口 */
+	imgEl.addEventListener("load", function () {
+		try {
+			var maxW = window.innerWidth * 0.92;
+			var maxH = window.innerHeight * 0.88;
+			var nw = imgEl.naturalWidth || imgEl.width;
+			var nh = imgEl.naturalHeight || imgEl.height;
+			if (nw > maxW || nh > maxH) {
+				scale = Math.min(maxW / nw, maxH / nh, 1);
+				applyScale();
+			}
+		} catch (eFit) {}
+	});
+	if (imgEl.complete) {
+		try { imgEl.dispatchEvent(new Event("load")); } catch (eL) {}
+	}
+}
+
+/**
+ * 捕获阶段：优先于分栏内 stopPropagation，统一处理正文与分栏图片单击放大。
+ * Shift+单击分栏内图片：仍走「选中媒体」以便 Delete 删除。
+ */
+function handleDocumentImageClick(e) {
+	if (_dtImageViewer) return;
+	var t = e.target;
+	if (!t || t.tagName !== "IMG") return;
+	if (!isPicoteZoomableImage(t)) return;
+
+	var col = t.closest && t.closest(".dt-column");
+	if (col && e.shiftKey && t.classList.contains("dt-media-img")) {
+		e.preventDefault();
+		e.stopPropagation();
+		selectMediaInColumn(col, t);
+		return;
+	}
+
+	var src = t.currentSrc || t.src;
+	if (!src) return;
+
+	e.preventDefault();
+	e.stopPropagation();
+	try { e.stopImmediatePropagation(); } catch (sI) {}
+	openImageViewer(src, t.alt || t.getAttribute("alt") || "");
+}
+
+/* =============================================================
    Unified Column Renderer — text + media mixed
    ============================================================= */
 
@@ -1318,14 +1501,11 @@ function renderColumnContent(col, rawContent, plugin) {
 					}
 				});
 				img.addEventListener("mousedown", function (ev) {
-					ev.preventDefault();
+					/* 避免误触编辑器；单击放大由 document 捕获阶段 handleDocumentImageClick 统一处理 */
 					ev.stopPropagation();
 				});
-				img.addEventListener("click", function (ev) {
-					ev.preventDefault();
-					ev.stopPropagation();
-					selectMediaInColumn(col, img);
-				});
+				img.classList.add("dt-media-img--zoomable");
+				img.title = "点一下，把画面捧到眼前 · Shift+点一下可选中删除";
 
 				/* 本地 ![[...]] 与远程 URL 一律套工具层：始终可见「下载 / 导出」按钮 */
 				var imgWrap = document.createElement("span");

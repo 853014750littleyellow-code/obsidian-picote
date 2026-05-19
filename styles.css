@@ -393,6 +393,102 @@
 	background: rgba(255, 255, 255, 0.2);
 }
 
+/* ─── Image lightbox viewer ───────────────────────────────── */
+
+.dt-image-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	background: rgba(0, 0, 0, 0.82);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	animation: dt-fade-in 0.2s ease;
+	outline: none;
+}
+
+.dt-image-viewer-wrap {
+	position: relative;
+	z-index: 20;
+	max-width: 96vw;
+	max-height: 92vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	pointer-events: none;
+	isolation: isolate;
+}
+
+.dt-image-viewer-img {
+	display: block;
+	position: relative;
+	z-index: 20;
+	max-width: 92vw;
+	max-height: 85vh;
+	object-fit: contain;
+	border-radius: 8px;
+	box-shadow: 0 8px 48px rgba(0, 0, 0, 0.55);
+	transform-origin: center center;
+	transition: transform 0.06s ease-out;
+	pointer-events: auto;
+	user-select: none;
+}
+
+/* 文案在底层；放大后的图片层叠在文案之上 */
+.dt-image-viewer-hint {
+	position: fixed;
+	bottom: 22px;
+	left: 0;
+	right: 0;
+	z-index: 10;
+	max-width: min(92vw, 520px);
+	margin: 0 auto;
+	padding: 6px 14px;
+	color: rgba(255, 255, 255, 0.88);
+	font-size: 12px;
+	line-height: 1.5;
+	text-align: center;
+	white-space: nowrap;
+	letter-spacing: 0.02em;
+	pointer-events: none;
+}
+
+.dt-image-viewer-close {
+	position: fixed;
+	top: 16px;
+	right: 20px;
+	z-index: 30;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 50%;
+	background: rgba(20, 20, 24, 0.75);
+	color: #fff;
+	font-size: 26px;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: auto;
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+	transition: background 0.15s, transform 0.15s;
+}
+.dt-image-viewer-close:hover {
+	background: rgba(255, 255, 255, 0.2);
+	transform: scale(1.06);
+}
+
+/* 可放大图片：鼠标提示 */
+.markdown-preview-view .markdown-rendered img,
+.cm-content img,
+.dt-media-img--zoomable {
+	cursor: zoom-in;
+}
+
 /* ─── Inter-column Inserter ───────────────────────────────── */
 
 .dt-inserter {
