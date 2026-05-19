@@ -1,212 +1,114 @@
-# Picote (Obsidian Columns) 🚀
+# Picote（Obsidian Columns）
 
-**Picote** 是一个专为追求极致效率的设计师和开发者打造的 Obsidian 智能分栏插件。它不仅是布局工具，更是你灵感采集流中的“无感自动化”中心。
+**Picote** 是给设计师和重度笔记用户用的 Obsidian 分栏插件：偏重**拖拽采集**与**尽量不打扰编辑流程**的实现。
 
 ---
 
-## 🌟 核心价值：为什么选择 Picote？
+## 为什么选择 Picote
 
-在开发 Picote 时，我遵循**第一性原理**重新思考了素材采集路径。传统的“复制粘贴”常受限于编辑器底层权限，而 Picote 另辟蹊径：
+- **低摩擦采集**：网页/花瓣/小红书/Pinterest 等场景下，倾向用**拖拽**把图放进分栏（比依赖粘贴更稳）。
+- **智能本地化**：能嗅探远程图 URL，静默下载并重命名后，把链接换成本地 `![[image.png]]`。
+- **写入节奏**：配合 `requestAnimationFrame` 等节奏，减轻高频写回导致的卡顿或报错。
+- **复杂 CDN**：对无扩展名、防盗链等链接有专门嗅探链路。
 
-*   **零摩擦采集 (Zero-Friction)**: 真正实现全网图片（花瓣、小红书、Pinterest 等）“一拖即入”，无需先下载到本地。
-*   **智能本地化 (Auto-Localization)**: 自动嗅探远程图片 URL，静默下载并重命名，自动将图链替换为本地 `![[image.png]]`。
-*   **底层写入优化**: 利用 `requestAnimationFrame` 寻找系统渲染空隙，彻底解决高频写入导致的编辑器死锁报错。
+插件界面与交互由作者按 UI/UX 思路做过拖拽反馈等方面的打磨。
 
-## 🛠️ 功能特性
+---
 
-*   **极简分栏语法**: 延续你熟悉的布局逻辑，但响应更顺滑。
-*   **跨平台 CDN 识别**: 针对无扩展名或防盗链的特殊 CDN 链接建立了嗅探管线。
-*   **设计驱动交互**: 作为一名 UI/UX 设计师，我优化了每一像素的拖拽反馈。
+## 功能概要
 
-## 🚀 快速开始
+- 简洁的分栏书写方式，预览下布局顺滑。
+- 跨平台 CDN / 外链识别管线。
+- 建议优先使用**拖拽**，作为与 Obsidian/CodeMirror 配合最稳的路径。
 
-1.  在 GitHub Releases 中下载最新的 `main.js`, `manifest.json`, `styles.css`。
-2.  将其放入你的 Obsidian 插件目录 `.obsidian/plugins/picote/`（文件夹名须与 `manifest.json` 里的 `id` 一致）。
-3.  在插件设置中启用，开始享受**一拖即入**的快感。
+---
 
-> **💡 专家建议**: 为了获得最稳定的体验，请优先使用**拖拽 (Drag & Drop)** 交互，这是我通过底层协议验证后的最优路径。
+## 安装与升级（通用）
 
-## 📋 更新日志
+1. 从 [GitHub Releases](https://github.com/) 下载对应版本的 `main.js`、`manifest.json`、`styles.css`（以 Release 资产为准）。
+2. 放到 `.obsidian/plugins/picote/`（目录名必须与 `manifest.json` 里的 `id` 一致）。
+3. 在「第三方插件」中启用；**升级后**建议**关闭插件再启用**，或重启 Obsidian。
 
-下列版本号与仓库内 [`manifest.json`](./manifest.json) 的 **`version`** 字段一致。
+下文各版本若在「所含文件」中**未写明** `styles.css`，则表示该版本未改样式文件，只需按需替换所列文件。
+
+> 版本号以仓库 [`manifest.json`](./manifest.json) 的 **`version`** 字段为准。
+
+---
+
+## 更新日志（精简）
 
 ### [2.3.5] — 2026-05-12
 
-**类型**：稳定性与体验修复（Bugfix）。
+**类型**：稳定性 / 交互修复  
 
-**升级**：替换 **`main.js`、`manifest.json`**（本版未改 `styles.css`），在 Obsidian 中关闭再启用本插件或重启应用。
+**所含文件**：`main.js`、`manifest.json`  
 
-#### Bug 10：在分栏里输入文字后，文字消失或跑到分栏外面
-
-**用户场景**：
-
-- 在某一栏里打「猫咪公馆」等文字，停顿一会儿后字突然不见；或下一刻输入直接出现在**分栏外的笔记正文**里，无法继续在分栏内编辑。
-
-**原因**：
-
-- v2.3.2 起 `input` / `compositionend` 在 800ms / 120ms 防抖后会 `syncToSource` 把内容写回 Markdown 源码。
-- Live Preview 模式下，源码一旦变化，Obsidian 会**用全新的 DOM 节点替换**整个分栏代码块（这是 CM6 atomic widget 的工作方式）。
-- v2.3.2 加在 wrapper 上的 `_dtSkipRebuild` 标记**只对同一个 DOM 节点有效**；Obsidian 用新节点整体替换旧节点时，标记并不会被搬到新节点上。
-- 后果：用户正在编辑的 `.dt-column` 节点被销毁 → 焦点掉到 CodeMirror → 还没"上屏"的字符被截断（消失）；后续按键直接落进笔记源码（"跑到分栏外"）。
-
-**处理**：
-
-- **编辑期间彻底不写回源码**：`input` / `compositionend` / `Enter` 三处都只更新 `wrapperEl._dtColumns` 数组，不再触发任何 `debouncedSync` / `syncToSource`，并主动清掉 `_syncTimer`。
-- **失焦时统一同步**：仍由 `blur` 触发一次 `debouncedSync` 写回源码并允许 post-processor 重建 DOM；保留 v2.3.3 的「孤儿节点 (`!col.isConnected`) 跳过」守卫，杜绝旧内容反向覆盖。
-- 体验：写字、中文拼音、换行不会被任何异步重建打断；切换到其他位置或保存前的失焦时，源码会一次性同步到位。
+**Bug 10：分栏内打字后字符消失或跑到分栏外**  
+输入法、停顿或 Enter 后会触发防抖写回，Live Preview 会整段换掉分栏 DOM，原先加在 wrapper 上的「跳过重建」标记无法迁移到新节点，导致焦点落到编辑器、观感上像丢字或「跑到外面」。  
+**处理**：输入 / `compositionend` / Enter 期间**只更新内存里的列数据**，不写回源码；**失焦**时再统一防抖同步（并保留孤儿列不写回的守卫）。
 
 ---
 
 ### [2.3.4] — 2026-05-12
 
-**类型**：稳定性与体验修复（Bugfix）。
+**类型**：稳定性 / 排版修复  
 
-**升级**：请同时替换 **`main.js`、`manifest.json`**（本版未改 `styles.css`），在 Obsidian 中关闭再启用本插件或重启应用。
+**所含文件**：`main.js`、`manifest.json`  
 
-#### Bug 9：「视频 + 文字」分栏正常显示后，下方仍漏出一行「```」三点，影响排版
-
-**用户场景**：
-
-- 左栏视频、右栏文字（视频 + 文字组合）。分栏整体已正确渲染，但分栏**下方**始终留着一行孤零零的 `` ``` ``（视觉上像「三个点」），其后大片空白拉远了下一段内容的相对位置，破坏了整体排版。
-- 2.3.1 已实现的 `cleanupStrayFenceNearWrapper` 在「图片 + 文字」下能盖住，但「视频 + 文字」下 Live Preview 的 DOM 重排时机更晚，往往落在原有 5 档延时窗口（0/48/120/320/720ms）之外，于是漏网。
-
-**原因**：
-
-- 原 `isNodeOnlyFenceText` 在「整行只剩 ```」之外还要求 `children.length <= 4`；CM6 把闭合围栏渲染到 `.cm-line` 里时可能带多个 `<span>`（高亮/装饰/光标占位），子元素数量超出阈值就被放过。
-- 原扫描循环 `limit++ < 28` 步、且只看「wrapperEl 的直接兄弟」与「父级的下一兄弟」，遇到被多层 `.cm-embed-block` / `.markdown-rendered` 包裹的结构会越过目标。
-- 仅有固定延时，没有 `MutationObserver`；视频/缩略图加载完成后 CM 二次重排时，已经过了所有 setTimeout 窗口，再也不会复查。
-
-**处理**：
-
-- 放宽 **`isNodeOnlyFenceText`**：只看 `textContent.trim()` 是否匹配 `^\`{3,}$`，**不再限制子元素数量**；同时主动跳过插件自身渲染的容器（`.dt-wrapper / .dt-container / .dt-column / .dt-floating-trigger / .dt-floating-menu`），杜绝自伤。
-- 扩大扫描范围：单轮最多 **200 步**，最多隐藏 **8 个**节点；**向上回溯至多 8 层祖先**（遇到 `.cm-editor / .markdown-preview-section / .markdown-preview-view / body` 停止），覆盖被嵌套包裹的闭合围栏。
-- 新增 **`ensureStrayFenceObserver`**：在 wrapper 最近的 `.cm-embed-block` / 父级上挂 `MutationObserver`，监听 `childList + subtree + characterData`。无论是 CM 异步重排、视频缩略图加载、还是 `debouncedSync` 之后的 post-processor 二次构建，新出现的 ``` 行都会立刻被隐藏；wrapper 离开 DOM 时观察者自动解绑。
-- `scheduleCleanupStrayFences` 延时档位从 5 个加密到 **8 个**（0 / 24 / 64 / 140 / 280 / 520 / 880 / 1400ms），并叠加 `requestAnimationFrame`，保留兜底。
+**Bug 9：视频 + 文字分栏下，底下仍露出单独一行 ```**  
+原判断过严、扫描步数与邻接关系不够，且视频加载后 DOM 二次重拍发生在固定延时之后，清理逻辑碰不到。  
+**处理**：按「整行是否为纯围栏」放宽判断并跳过插件自身容器；扩大向上回溯与扫描步数；用 **MutationObserver** 补齐异步重排；延时档位加密并叠加 `requestAnimationFrame`。
 
 ---
 
 ### [2.3.3] — 2026-05-12
 
-**类型**：稳定性与体验修复（Bugfix）。
+**类型**：稳定性 / 拖放修复  
 
-**升级**：请同时替换 **`main.js`、`manifest.json`**（本版未改 `styles.css`），在 Obsidian 中关闭再启用本插件或重启应用。
+**所含文件**：`main.js`、`manifest.json`  
 
-#### Bug 8：分栏一侧已有视频/文字时，向另一侧拖图片「拖了像没反应」；拖入视频后另一侧文字「闪闪闪」
+**Bug 8：一侧有视频/文字时，拖图「没反应」；拖视频后另一侧文字闪烁**  
 
-**用户场景**：
-
-- 左栏视频、右栏文字（如截图所示）：把下载好的图片拖入**右侧已有文字**的分栏，看起来「拖不进去」。
-- 当前笔记中已有这段视频，把视频拖入分栏不生效，必须从系统资源管理器（外部 Downloads）才拖得动。
-- 视频从外部成功拖进来之后，**另一栏的文字会"闪一下"**（DOM 被快速重建两次）。
-
-**原因**：
-
-- **(A) blur 反向覆盖（拖图片"看似没反应"的真凶）**：用户先把光标点在右栏文字上读 → 触发 `focus`、`wrapperEl._dtSkipRebuild = true`。随后释放图片 → `handleDtColumnDataDrop` 异步把图片写入 vault、`appendToColumn` 更新 `columns[colIdx]` 为 `"原文字<br>![[image.png]]"`、`buildContainer(force=true)` `el.empty()` 把右栏从 DOM 摘下。此时浏览器在被摘除的「孤儿列」上触发了一次 `blur`，旧的 `blur` 处理器**继续** `serializeColumnContent(col)`（读到的是重建**前**的旧 DOM，里面只有 `"原文字"`），然后 `columns[colIdx] = stored` 把刚追加好的引用**反向覆盖**掉，再 `debouncedSync` 把"原文字"写回源码 → 图片视觉上"瞬间消失"。
-- **(B) 双重重建闪烁**：`handleDtColumnDataDrop` / `handleFileDrop` / `handleClipboardFile` 等路径在 `buildContainer(force=true)` 之后**直接**调 `syncToSource`，把 `_dtSkipRebuild` 当成 `false`。Obsidian 的 markdown post-processor 在 CM `dispatch` 之后异步又跑一次 `buildContainer(force=undefined)`，于是同一段 DOM 被来回重建两次 → 文字/视频闪烁。
-- **(C) 同笔记内视频拖不动**：`dragstart` 之前只对 `IMG` 元素做了「按文件名扫 CodeMirror 行号 → 回写 wikilink」的兜底，**没给 `VIDEO` 做对称兜底**；从 Live Preview 渲染的 `<video>` 起拖时 `posAtCoords` 偶尔解析不出正确行号，`_dragSession.ref` 留空，drop 时只能依赖 `dt.files / extractImageFromHtml` 等不识别视频的兜底，于是「同笔记的视频」永远拖不进。
-- **(D) wikilink 误判成外部源**：drop 时 `hasExternalEvidence` 检查 `text/html` 类型，Obsidian 内部拖拽的视频/图片同时会带 `text/html`，于是 `if (capturedRef && !hasExternalEvidence)` 被否定，绕开「按笔记内引用追加」的正确分支。
-
-**处理**：
-
-- 新增 **`col.isConnected` 守卫**：`blur` 处理器一开始就判断当前列是否仍挂在 DOM 上；不在则只清理 `_activeEditCol` / `selected` class，**不再**读取旧 DOM、不再写回 `columns`、不再触发 `debouncedSync`，杜绝旧内容反向覆盖。
-- **统一改用 `debouncedSync`** 替代直接 `syncToSource`：所有「内部用户动作 → `buildContainer(force=true)` → 写回源码」的路径（`handleDtColumnDataDrop` 全部分支、`handleFileDrop`、`handleClipboardFile`、`processPasteIntoColumn`、`makeInserter`、`insertRemoteMedia`、删除选中媒体）都改走 `debouncedSync`。它先把 `_dtSkipRebuild=true`，~600ms 后再放，期间 markdown post-processor 的 `buildContainer(force=false)` 会因 `_dtSkipRebuild && _dtBuilt` 立即 return，消除二次重建闪烁。
-- 新增 **`isInternalWikilinkRef`**：`drop` 入口对 `capturedRef` 与 `plain` 分别做 wikilink 形态检查；只要是 `![[...]]` 就强制走「笔记内追加」分支，**不再被 `hasExternalEvidence` 否定**。
-- 给 `dragstart` 增加 **VIDEO 兜底**：取 `vidEl.alt / vidEl.src / vidEl.currentSrc` 的文件名，扫一遍当前文档行（跳过代码块），命中则 `captureLine(line)`；没命中也至少 `beginDragSession("![[<filename>]]", ...)` 兜住，drop 时直接复用 wikilink 分支。
+- blur 在列已从 DOM 移除后仍用旧 DOM 序列化，把刚写入的内容盖掉 → 增加 **`col.isConnected`** 守卫。  
+- 多处 `syncToSource` 与异步重建打架 → **统一走 `debouncedSync`**，与 `_dtSkipRebuild` 配合减少双次重建。  
+- 同笔记内从 `<video>` 拖拽缺兜底 → **`dragstart` 对齐 VIDEO**。  
+- 带 `text/html` 的内部 wikilink 被误判为外链 → **`isInternalWikilinkRef`** 强制走笔记内分支。
 
 ---
 
 ### [2.3.2] — 2026-05-12
 
-**类型**：稳定性与体验修复（Bugfix）。
+**类型**：稳定性修复  
 
-**升级**：请同时替换 **`main.js`、`styles.css`、`manifest.json`**，在 Obsidian 中关闭再启用本插件或重启应用。
+**所含文件**：`main.js`、`styles.css`、`manifest.json`  
 
-#### Bug 6：在分栏里按 Enter，新内容跑到分栏外面 / 编辑没完成就「不让继续」
+- **Bug 6**：Enter 用 `execCommand` 在 CM6 嵌套 `contenteditable` 下不可靠 → 改为 **Range 插 `<br>`** 并拦事件冒泡；`buildContainer` 增加 **`force`**；聚焦期 **`_dtSkipRebuild`**，`debouncedSync` 编辑中不草率放开。  
+- **Bug 7**：首张图写入后第二张拖中间栏失败 → drop 入口重置跳过标记与定时器；异步回调从 **`wrapperEl._dtColumns`** 取最新数组再写入。
 
-**原因**：
-
-- 旧实现使用 `document.execCommand("insertLineBreak")` 处理 Enter。在「`.dt-column` (contenteditable) 嵌在 `.cm-content` (contenteditable) 之内」的 Live Preview 环境下，行为不稳，按键易被 CodeMirror 当成「源码换行」，把后续输入挤到分栏外面。
-- 用户输入后 `debouncedSync` 会写回源码，触发 Obsidian markdown post-processor **异步**重新调用 `buildContainer` → `el.empty()`，正在编辑的列 DOM 被销毁，焦点掉到 CodeMirror，看起来「不让我接着编辑」。
-
-**处理**：
-
-- 新增 **`insertBrInColumnAtCaret`**：用 Range API 手动在光标处插入 `<br>`（并在行尾补一个占位 `<br>` 让光标显示在新行），不再依赖 `execCommand`；Enter 事件 `stopImmediatePropagation`，杜绝冒泡到 CM。
-- 给 `buildContainer` 增加 **`force`** 参数：所有「用户动作触发」的内部重建都传 `force=true`，**markdown post-processor 等外部回调**继续走 `_dtSkipRebuild` 检查。
-- **聚焦** 时把 `wrapperEl._dtSkipRebuild = true`，**失焦** 时延迟 650ms 再放开；`debouncedSync` 在仍有列处于编辑时**不主动**释放该标志，避免 post-processor 在编辑半途偷偷重建 DOM。
-
-#### Bug 7：成功拖入一张图后，第二张图拖到中间空栏拖不进去
-
-**原因**：
-
-- 第一次 drop 之后 `wrapperEl._dtSkipRebuild` 可能仍为 `true`（聚焦保护期或同步窗口内），后续 `buildContainer` 直接 `return`，UI 不刷新 → 看起来「拖了没反应」。
-- `handleFileDrop` 使用 `FileReader` 读文件，期间 post-processor 可能已经把 `wrapperEl._dtColumns` 换成从源码重新 parse 出的**新数组**，闭包里的旧数组指针**已不被 wrapper 引用**，往里追加新图也无法体现到 UI。
-
-**处理**：
-
-- 在 `handleDtColumnDataDrop` 入口**强制重置** `wrapperEl._dtSkipRebuild = false`，并清掉残留的 `_syncTimer`。
-- `handleFileDrop` / `handleClipboardFile` 的异步回调中，从 **`wrapperEl._dtColumns`** 重新取最新数组与有效 `colIdx`，再做 `appendToColumn` 与 `buildContainer(..., true)`，确保新图始终落到当前 UI 持有的列数组上。
+---
 
 ### [2.3.1] — 2026-05-12
 
-**类型**：稳定性与体验修复（Bugfix）。
+**类型**：首批稳定性修复  
 
-**升级**：请同时替换 **`main.js`、`styles.css`、`manifest.json`**，在 Obsidian 中关闭再启用本插件或重启应用。
+**所含文件**：`main.js`、`styles.css`、`manifest.json`  
 
-#### Bug 1：首次拖入本地/下载图片时，分栏无反应但文件已进入仓库
+- **Bug 1**：Obsidian 先处理 drop → 在 **window 捕获阶段**处理落在分栏上的拖放；`items` → `getAsFile()` 兜底。  
+- **Bug 2**：`<div><br></div>` 序列化多出空行 → **`serializeColumnContent`** 区分空块与单媒体块。  
+- **Bug 3**：IME 期间防抖写回打断组字 → **composition** 门禁 + 失焦轮询等待。  
+- **Bug 4**：点分栏误入代码块视图 → **z-index / isolation**，收窄 `.dt-inserter` 热区，事件 **`stopPropagation`**。  
+- **Bug 5**：闭合围栏单独成行的「假 ```」→ **`cleanupStrayFenceNearWrapper`**（可能误伤分栏外故意写的单独围栏，属权衡）。
 
-**原因**：Obsidian 默认的 `drop` 处理顺序较早，分栏逻辑抢不到首次投放，容易出现「库里已有文件、预览里却没更新」。
-
-**处理**：
-
-- 在 **`window` 捕获阶段**拦截落在 `.dt-column` 上的 `dragover` / `drop`，优先执行分栏逻辑并阻断与默认行为冲突。
-- 增加 **`dataTransfer.items` → `getAsFile()`** 兜底：部分环境下首次 `drop` 时 `files` 仍为空，但从 `items` 可取到文件。
-
-#### Bug 2：仅在一栏输入后失焦，另一栏无故多出空行或「下移」
-
-**原因**：`contenteditable` 常见 DOM 结构 `<div><br></div>` 在旧版序列化里被当成两段换行，写回 Markdown 后多出一倍空行。
-
-**处理**：在 `serializeColumnContent` 中区分「空行块」与「仅含一张图/视频的块」，避免对 `<div><br></div>` 重复插入 `<br>`，也避免在仅含媒体的 div 前多垫一行。
-
-#### Bug 3：中文拼音输入时停顿几秒，会突然冒出之前的拼音
-
-**原因**：打字过程中 **`input` 触发的防抖写回** 会调用 `syncToSource`，Live Preview 整块重绘 `contenteditable`，打断 **IME 组字**，导致拼音残留或错乱。
-
-**处理**：
-
-- 在 **`compositionstart` ~ `compositionend`** 期间禁止安排写回；并配合 **`input.isComposing`** 兜底。
-- **`compositionend`** 后短延迟再同步；**失焦** 时若仍在组字则轮询等待结束后再写回。
-
-#### Bug 4：点击某一分栏（尤其第二栏）顶部后，预览塌成源码块、图片不显示
-
-**原因**：分栏与 CodeMirror 之间存在**命中层叠**；列间插入条 **`.dt-inserter::before` 热区过宽**，容易点到「看不见的间隙」使事件落到编辑器，触发「编辑代码块」视图。
-
-**处理**：
-
-- `.dt-wrapper` 提高 **z-index** 与 **isolation**，减少被 CM 透明层盖住。
-- **收窄** `.dt-inserter::before` 的可点热区，减少侵入左右两栏点击区域。
-- 在 **分栏、列间插入条、角标** 上对 `mousedown` / `pointerdown` / `click`（等）做 **`stopPropagation`**，避免误触编辑器。
-
-#### Bug 5：四栏等布局正常显示后，下方仍多出一行「```」三点与空白编辑感
-
-**原因**：Live Preview 偶将把**闭合围栏**单独渲成 DOM 里一行「孤零零的 ```」，并非你多写了一段正文。
-
-**处理**：
-
-- 增强 **`cleanupStrayFenceNearWrapper`**：扫描分栏根节点之后的兄弟与父级后续子节点，将**仅含反引号围栏**的节点隐藏（含多次延时与 `debouncedSync` 后的再扫描）。
-- **注意**：若你在分栏**外部**刻意写一行单独 ` ``` `，有可能被同一套启发式误判隐藏；属为消除「假三个点」所做的权衡。
+---
 
 ### [2.3.0] 及更早
 
-更早版本的变更未在本文档逐条归档；完整历史见仓库提交记录或 Release 说明。
+更早变更见仓库提交历史或 Release 说明。
 
 ---
 
-## 📝 开发复盘与方法论
+## 关于开发与作者
 
-Picote 的诞生是我对 Obsidian 底层架构（CodeMirror 6）深度研究的产物：
-- **避实击虚**: 绕过受限的粘贴事件，利用高优先级的拖拽协议。
-- **异步平衡**: 用工程逻辑实现设计自由。
-
----
+Picote 是在 Obsidian / CodeMirror 6 环境下的工程取舍：在保证可维护的前提下，用**拖拽优先**与**异步写回节拍**换来的稳定体验。
 
 **Designed with ❤️ by Pipi_huang**
