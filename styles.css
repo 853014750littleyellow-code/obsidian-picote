@@ -251,10 +251,10 @@
 	display: block;
 }
 
-.dt-img-download-btn {
+.dt-img-download-btn,
+.dt-img-delete-btn {
 	position: absolute;
 	top: 8px;
-	right: 8px;
 	width: 28px;
 	height: 28px;
 	padding: 0;
@@ -264,7 +264,7 @@
 	background: rgba(20, 20, 24, 0.72);
 	color: #fff;
 	border: 1px solid rgba(255, 255, 255, 0.22);
-	border-radius: 6px;
+	border-radius: 50px;
 	cursor: pointer;
 	opacity: 0.9;
 	transform: translateY(0);
@@ -276,10 +276,27 @@
 	pointer-events: auto;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
-.dt-img-toolbar-wrap:hover .dt-img-download-btn {
+
+.dt-img-download-btn svg,
+.dt-img-delete-btn svg {
+	transform: scale(0.9);
+	transform-origin: center;
+}
+
+.dt-img-download-btn {
+	right: 8px;
+}
+
+.dt-img-delete-btn {
+	right: 44px;
+}
+
+.dt-img-toolbar-wrap:hover .dt-img-download-btn,
+.dt-img-toolbar-wrap:hover .dt-img-delete-btn {
 	opacity: 1;
 }
-.dt-img-download-btn:focus-visible {
+.dt-img-download-btn:focus-visible,
+.dt-img-delete-btn:focus-visible {
 	opacity: 1;
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 2px;
@@ -288,7 +305,12 @@
 	background: rgb(218, 206, 255);
 	border-color: rgba(255, 255, 255, 0.45);
 }
-.dt-img-download-btn:active {
+.dt-img-delete-btn:hover {
+	background: rgb(218, 206, 255);
+	border-color: rgba(255, 255, 255, 0.45);
+}
+.dt-img-download-btn:active,
+.dt-img-delete-btn:active {
 	transform: scale(0.94);
 }
 
@@ -433,6 +455,13 @@
 	transition: transform 0.06s ease-out;
 	pointer-events: auto;
 	user-select: none;
+	cursor: grab;
+	touch-action: none;
+}
+
+.dt-image-viewer-img.dt-image-viewer-img--dragging {
+	cursor: grabbing;
+	transition: none;
 }
 
 /* 文案在底层；放大后的图片层叠在文案之上 */

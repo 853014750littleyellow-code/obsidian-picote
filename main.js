@@ -996,7 +996,7 @@ function buildContainer(columns, el, ctx, plugin, force) {
 		var col = container.createDiv({ cls: "dt-column" });
 		col.setAttribute("data-col-index", String(idx));
 
-		renderColumnContent(col, text, plugin);
+		renderColumnContent(col, text, plugin, columns, idx, el);
 
 		bindColumnEvents(col, columns, idx, el, plugin);
 		bindDragDrop(col, columns, idx, el, plugin);
@@ -1325,6 +1325,13 @@ function openImageViewer(src, alt) {
 	closeImageViewer();
 
 	var scale = 1;
+	var offsetX = 0;
+	var offsetY = 0;
+	var isDragging = false;
+	var dragStartX = 0;
+	var dragStartY = 0;
+	var dragBaseX = 0;
+	var dragBaseY = 0;
 	_dtImageViewerScale = 1;
 
 	var overlay = document.createElement("div");
@@ -1343,9 +1350,9 @@ function openImageViewer(src, alt) {
 	imgEl.alt = alt || "";
 	imgEl.draggable = false;
 
-	function applyScale() {
+	function applyTransform() {
 		_dtImageViewerScale = scale;
-		imgEl.style.transform = "scale(" + scale + ")";
+		imgEl.style.transform = "translate(" + offsetX + "px, " + offsetY + "px) scale(" + scale + ")";
 	}
 
 	var hint = document.createElement("div");
@@ -1365,11 +1372,47 @@ function openImageViewer(src, alt) {
 		var step = (e.ctrlKey || e.metaKey) ? 0.06 : 0.12;
 		if (e.deltaY < 0) scale = Math.min(scale + step, 8);
 		else scale = Math.max(scale - step, 0.12);
-		applyScale();
+		applyTransform();
+	}
+
+	function onPointerDown(e) {
+		if (e.button != null && e.button !== 0) return;
+		e.preventDefault();
+		e.stopPropagation();
+		isDragging = true;
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+		dragBaseX = offsetX;
+		dragBaseY = offsetY;
+		imgEl.classList.add("dt-image-viewer-img--dragging");
+		try { imgEl.setPointerCapture(e.pointerId); } catch (capErr) {}
+	}
+
+	function onPointerMove(e) {
+		if (!isDragging) return;
+		e.preventDefault();
+		e.stopPropagation();
+		offsetX = dragBaseX + (e.clientX - dragStartX);
+		offsetY = dragBaseY + (e.clientY - dragStartY);
+		applyTransform();
+	}
+
+	function endDrag(e) {
+		if (!isDragging) return;
+		isDragging = false;
+		imgEl.classList.remove("dt-image-viewer-img--dragging");
+		try {
+			if (e && e.pointerId != null) imgEl.releasePointerCapture(e.pointerId);
+		} catch (relErr) {}
 	}
 
 	wrap.addEventListener("wheel", onWheel, { passive: false });
 	overlay.addEventListener("wheel", onWheel, { passive: false });
+	imgEl.addEventListener("pointerdown", onPointerDown);
+	imgEl.addEventListener("pointermove", onPointerMove);
+	imgEl.addEventListener("pointerup", endDrag);
+	imgEl.addEventListener("pointercancel", endDrag);
+	imgEl.addEventListener("lostpointercapture", endDrag);
 	overlay.addEventListener("keydown", handleImageViewerKeydown, true);
 
 	closeBtn.addEventListener("click", function (e) {
@@ -1406,7 +1449,7 @@ function openImageViewer(src, alt) {
 			var nh = imgEl.naturalHeight || imgEl.height;
 			if (nw > maxW || nh > maxH) {
 				scale = Math.min(maxW / nw, maxH / nh, 1);
-				applyScale();
+				applyTransform();
 			}
 		} catch (eFit) {}
 	});
@@ -1446,7 +1489,7 @@ function handleDocumentImageClick(e) {
    Unified Column Renderer — text + media mixed
    ============================================================= */
 
-function renderColumnContent(col, rawContent, plugin) {
+function renderColumnContent(col, rawContent, plugin, columns, colIdx, wrapperEl) {
 	col.setAttribute("contenteditable", "true");
 	col.setAttribute("spellcheck", "false");
 	col.setAttribute("tabindex", "0");
@@ -1507,7 +1550,7 @@ function renderColumnContent(col, rawContent, plugin) {
 				img.classList.add("dt-media-img--zoomable");
 				img.title = "点一下，把画面捧到眼前 · Shift+点一下可选中删除";
 
-				/* 本地 ![[...]] 与远程 URL 一律套工具层：始终可见「下载 / 导出」按钮 */
+				/* 本地 ![[...]] 与远程 URL 一律套工具层：始终可见「下载 / 导出」和「删除」按钮 */
 				var imgWrap = document.createElement("span");
 				imgWrap.className = "dt-img-toolbar-wrap";
 				imgWrap.setAttribute("contenteditable", "false");
@@ -1544,6 +1587,45 @@ function renderColumnContent(col, rawContent, plugin) {
 				})(url, trimmed, !!(media.isUrl || isExternalUrl(media.file)));
 
 				imgWrap.appendChild(dlBtn);
+
+				var delBtn = document.createElement("button");
+				delBtn.type = "button";
+				delBtn.className = "dt-img-delete-btn";
+				delBtn.setAttribute("aria-label", "删除图片");
+				delBtn.title = "从分栏中删除这张图片";
+				delBtn.innerHTML =
+					'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" ' +
+					'viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+					'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+					'<line x1="18" y1="6" x2="6" y2="18"/>' +
+					'<line x1="6" y1="6" x2="18" y2="18"/></svg>';
+				(function (capturedWrap, capturedRef, capturedPartIndex) {
+					delBtn.addEventListener("pointerdown", function (ev) {
+						ev.preventDefault();
+						ev.stopPropagation();
+					});
+					delBtn.addEventListener("mousedown", function (ev) {
+						ev.preventDefault();
+						ev.stopPropagation();
+					});
+					delBtn.addEventListener("click", function (ev) {
+						ev.preventDefault();
+						ev.stopPropagation();
+						try { ev.stopImmediatePropagation(); } catch (sDel) {}
+						if (!columns || colIdx == null || !wrapperEl) {
+							try { new obsidian.Notice("删除失败：分栏上下文丢失，请重载插件后再试"); } catch (nDel) {}
+							return;
+						}
+						if (removeMediaRefFromColumn(columns, colIdx, capturedRef, capturedPartIndex)) {
+							buildContainer(columns, wrapperEl, wrapperEl._dtCtx, plugin, true);
+							debouncedSync(wrapperEl);
+						} else {
+							removeMediaInColumn(col, columns, colIdx, wrapperEl, capturedWrap);
+						}
+					});
+				})(imgWrap, trimmed, i);
+
+				imgWrap.appendChild(delBtn);
 				col.appendChild(imgWrap);
 			} else if (media.type === "video") {
 				var wrapper = document.createElement("div");
@@ -1721,6 +1803,32 @@ function appendToColumn(columns, colIdx, newRef) {
 	columns[colIdx] = existing ? existing + "<br>" + newRef : newRef;
 }
 
+function removeMediaRefFromColumn(columns, colIdx, mediaRef, partIndex) {
+	if (!columns || colIdx == null || colIdx < 0 || colIdx >= columns.length) return false;
+	var target = String(mediaRef || "").trim();
+	if (!target) return false;
+	var parts = String(columns[colIdx] || "").split("<br>");
+	if (typeof partIndex === "number" && partIndex >= 0 && partIndex < parts.length &&
+		String(parts[partIndex] || "").trim() === target) {
+		parts.splice(partIndex, 1);
+		columns[colIdx] = parts.join("<br>").replace(/^(<br>)+|(<br>)+$/g, "").replace(/(<br>){3,}/g, "<br><br>");
+		return true;
+	}
+	var removed = false;
+	var kept = [];
+	for (var i = 0; i < parts.length; i++) {
+		var part = String(parts[i] || "");
+		if (!removed && part.trim() === target) {
+			removed = true;
+			continue;
+		}
+		kept.push(part);
+	}
+	if (!removed) return false;
+	columns[colIdx] = kept.join("<br>").replace(/^(<br>)+|(<br>)+$/g, "").replace(/(<br>){3,}/g, "<br><br>");
+	return true;
+}
+
 /**
  * 在分栏内当前光标处插入换行：手动用 Range API，避免 execCommand("insertLineBreak")
  * 在「contenteditable 嵌 contenteditable」(分栏在 .cm-content 内) 环境下的不稳定行为，
@@ -1850,17 +1958,20 @@ function selectMediaInColumn(col, mediaEl) {
 	if (col && typeof col.focus === "function") col.focus();
 }
 
-function removeSelectedMediaInColumn(col, columns, colIdx, wrapperEl) {
+function removeMediaInColumn(col, columns, colIdx, wrapperEl, mediaEl) {
 	if (!col) return false;
-	var media = col.querySelector(".dt-media--selected");
+	var media = mediaEl || col.querySelector(".dt-media--selected");
 	if (!media) return false;
 
 	/* 若在工具包裹层中，整个 wrap 一并删除 */
 	var removeTarget = media;
-	if (media.parentNode && media.parentNode.classList &&
+	if (media.classList && media.classList.contains("dt-img-toolbar-wrap")) {
+		removeTarget = media;
+	} else if (media.parentNode && media.parentNode.classList &&
 		media.parentNode.classList.contains("dt-img-toolbar-wrap")) {
 		removeTarget = media.parentNode;
 	}
+	if (!removeTarget.parentNode) return false;
 
 	var next = removeTarget.nextSibling;
 	if (next && next.nodeName === "BR") {
@@ -1878,6 +1989,10 @@ function removeSelectedMediaInColumn(col, columns, colIdx, wrapperEl) {
 	}
 	debouncedSync(wrapperEl);
 	return true;
+}
+
+function removeSelectedMediaInColumn(col, columns, colIdx, wrapperEl) {
+	return removeMediaInColumn(col, columns, colIdx, wrapperEl, null);
 }
 
 /* =============================================================
